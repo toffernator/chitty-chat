@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option go_package = "github.com/toffernator/chitty-chat/protofiles";
+
+message Address {
+    int64 lamportTs = 1;
+    string address = 2;
+}
+
+message StatusOk {
+    int64 lamportTs = 1;
+}
+
+message Status {
+    int64 lamportTs = 1;
+    enum StatusCode {
+        OK = 0;
+        INVALIDMSG = 1;
+        INCOMPLETEBROADCAST = 2;
+    }
+}
+
+message Message {
+    int64 lamportTs = 1;
+    string contents = 2;
+}
+
+service ClientToServerService {
+    rpc Join(Address) returns (StatusOk);
+    rpc Leave(Address) returns (StatusOk);
+    rpc Publish(Message) returns (Status);
+}

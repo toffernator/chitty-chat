@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option go_package = "github.com/toffernator/chitty-chat/protofiles";
+
+message Message {
+    int64 lamportTs = 1;
+    string contents = 2;
+}
+
+message StatusOk {
+    int64 lamportTs = 1;
+}
+
+service ServerToClient {
+    rpc Broadcast(Message) returns (StatusOk);
+}
