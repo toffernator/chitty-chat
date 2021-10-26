@@ -41,7 +41,7 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 	// USUALLY HERE: defer conn.close()
 
 	client := ServerBindings.NewServerToClientClient(conn)
-	s.clients = append(s.clients, client)
+	s.clients[in.Address] = client
 	broadcastMsg := fmt.Sprintf("%s @ % joined", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
 
@@ -53,9 +53,16 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 func (s *Server) Leave(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
 	log.Printf("Client %s leaving", in.Address)
 
-	for _, client := range s.clients {
-
+	for address, _ := range s.clients {
+		if address == in.Address {
+			delete(s.clients, address)
+		}
 	}
+
+	broadcastMsg := fmt.Sprintf("%s has left @ %d", in.Address, s.lamport.Read())
+	s.broadcast(broadcastMsg)
+
+	return &ClientBindings.StatusOk{}, nil
 }
 
 func (s *Server) Publish(ctx context.Context, in *ClientBindings.Message) (*ClientBindings.Status, error) {
