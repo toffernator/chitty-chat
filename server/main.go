@@ -18,14 +18,19 @@ const (
 )
 
 type Server struct {
-	clients map[string]ServerBindings.ServerToClientClient
+	clients map[string]client
 	lamport logicalclock.LamportClock
 	ClientBindings.UnimplementedClientToServerServiceServer
 }
 
+type client struct {
+	ServerBindings.ServerToClientClient
+	Connection *grpc.ClientConn
+}
+
 func NewServer() *Server {
 	s := Server{
-		clients: make(map[string]ServerBindings.ServerToClientClient),
+		clients: make(map[string]client),
 	}
 	return &s
 }
@@ -40,7 +45,11 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 	}
 	// USUALLY HERE: defer conn.close()
 
-	client := ServerBindings.NewServerToClientClient(conn)
+	// Adding to map
+	client := client{
+		ServerBindings.NewServerToClientClient(conn),
+		conn,
+	}
 	s.clients[in.Address] = client
 	broadcastMsg := fmt.Sprintf("%s @ %d joined", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
@@ -53,8 +62,9 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 func (s *Server) Leave(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
 	log.Printf("Client %s leaving", in.Address)
 
-	for address, _ := range s.clients {
+	for address, client := range s.clients {
 		if address == in.Address {
+			client.Connection.Close()
 			delete(s.clients, address)
 		}
 	}
