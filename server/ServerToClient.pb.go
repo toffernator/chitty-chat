@@ -4,7 +4,7 @@
 // 	protoc        v3.14.0
 // source: ServerToClient.proto
 
-package protofiles
+package server
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
