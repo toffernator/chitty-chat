@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/toffernator/chitty-chat/protofiles";
+option go_package = "github.com/toffernator/chitty-chat/server";
 
 message Message {
     int64 lamportTs = 1;
