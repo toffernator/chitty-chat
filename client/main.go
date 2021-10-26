@@ -3,10 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/toffernator/chitty-chat/client/bindings"
+	serverBindings "github.com/toffernator/chitty-chat/server/bindings"
 
 	"google.golang.org/grpc"
+)
+
+const (
+	serverHost = "localhost:50051"
 )
 
 type Client struct {
@@ -38,5 +45,19 @@ func (c *Client) Publish(ctx context.Context, in *bindings.Message, opts ...grpc
 }
 
 func main() {
+	conn, err := grpc.Dial(serverHost, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
 
+	clientOfServer := serverBindings.NewServerToClientClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	message := os.Args[1]
+	clientOfServer.Broadcast(ctx, &serverBindings.Message{
+		LamportTs: 0,
+		Contents:  message,
+	})
 }
