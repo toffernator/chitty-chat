@@ -6,7 +6,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/toffernator/chitty-chat/server/bindings"
+	"github.com/toffernator/chitty-chat/client/bindings"
 	"google.golang.org/grpc"
 )
 
@@ -16,14 +16,29 @@ const (
 
 type Server struct {
 	clients []string
-	bindings.UnimplementedServerToClientServer
+	bindings.UnimplementedClientToServerServiceServer
 }
 
-func (s *Server) Broadcast(ctx context.Context, in *bindings.Message) (*bindings.StatusOk, error) {
-	for _, client := range s.clients {
-		fmt.Printf("Broadcasting to client %s: %s", client, in.Contents)
-	}
-	return &bindings.StatusOk{}, nil
+func (s *Server) Join(ctx context.Context, in *bindings.Address) (*bindings.StatusOk, error) {
+	fmt.Printf("Client %s joining server %s", in.Address, address)
+	return &bindings.StatusOk{
+		LamportTs: 0,
+	}, nil
+}
+
+func (s *Server) Leave(ctx context.Context, in *bindings.Address) (*bindings.StatusOk, error) {
+	fmt.Printf("Client %s leaving server %s", in.Address, address)
+	return &bindings.StatusOk{
+		LamportTs: 0,
+	}, nil
+}
+
+func (s *Server) Publish(ctx context.Context, in *bindings.Message) (*bindings.Status, error) {
+	fmt.Printf("Client %s publishing to server %s: %s", in.Sender, address, in.Contents)
+	return &bindings.Status{
+		LamportTs:  0,
+		StatusCode: bindings.Status_OK,
+	}, nil
 }
 
 func main() {
@@ -35,7 +50,7 @@ func main() {
 
 	server := Server{}
 
-	bindings.RegisterServerToClientServer(s, &server)
+	bindings.RegisterClientToServerServiceServer(s, &server)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
