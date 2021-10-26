@@ -18,9 +18,16 @@ const (
 )
 
 type Server struct {
-	clients []ServerBindings.ServerToClientClient
+	clients map[string]ServerBindings.ServerToClientClient
 	lamport logicalclock.LamportClock
 	ClientBindings.UnimplementedClientToServerServiceServer
+}
+
+func NewServer() *Server {
+	s := Server{
+		clients: make(map[string]ServerBindings.ServerToClientClient),
+	}
+	return &s
 }
 
 func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
@@ -44,14 +51,17 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 }
 
 func (s *Server) Leave(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
-	fmt.Printf("Client %s leaving server %s", in.Address, address)
-	return &ClientBindings.StatusOk{
-		LamportTs: 0,
-	}, nil
+	log.Printf("Client %s leaving", in.Address)
+
+	for _, client := range s.clients {
+
+	}
 }
 
 func (s *Server) Publish(ctx context.Context, in *ClientBindings.Message) (*ClientBindings.Status, error) {
 	fmt.Printf("Client %s publishing to server %s: %s", in.Sender, address, in.Contents)
+	broadcastMsg := fmt.Sprintf("%s @ %d: %s", in.Sender, s.lamport.Read(), in.Contents)
+	s.broadcast(broadcastMsg)
 	return &ClientBindings.Status{
 		LamportTs:  0,
 		StatusCode: ClientBindings.Status_OK,
@@ -76,9 +86,9 @@ func main() {
 	}
 	s := grpc.NewServer()
 
-	server := Server{}
+	server := NewServer()
 
-	ClientBindings.RegisterClientToServerServiceServer(s, &server)
+	ClientBindings.RegisterClientToServerServiceServer(s, server)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
