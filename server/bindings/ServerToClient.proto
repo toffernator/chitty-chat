@@ -1,6 +1,8 @@
 syntax = "proto3";
 
-option go_package = "github.com/toffernator/chitty-chat/server";
+package ServerToClient;
+
+option go_package = "github.com/toffernator/chitty-chat/server/bindings";
 
 message Message {
     int64 lamportTs = 1;

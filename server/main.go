@@ -35,7 +35,7 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 
 	client := ServerBindings.NewServerToClientClient(conn)
 	s.clients = append(s.clients, client)
-	broadcastMsg := fmt.Sprintf("%s @ %d joined", in.Address, s.lamport.Read())
+	broadcastMsg := fmt.Sprintf("%s @ % joined", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
 
 	return &ClientBindings.StatusOk{

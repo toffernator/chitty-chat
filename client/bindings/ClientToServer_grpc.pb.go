@@ -33,7 +33,7 @@ func NewClientToServerServiceClient(cc grpc.ClientConnInterface) ClientToServerS
 
 func (c *clientToServerServiceClient) Join(ctx context.Context, in *Address, opts ...grpc.CallOption) (*StatusOk, error) {
 	out := new(StatusOk)
-	err := c.cc.Invoke(ctx, "/ClientToServerService/Join", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ClientToServer.ClientToServerService/Join", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *clientToServerServiceClient) Join(ctx context.Context, in *Address, opt
 
 func (c *clientToServerServiceClient) Leave(ctx context.Context, in *Address, opts ...grpc.CallOption) (*StatusOk, error) {
 	out := new(StatusOk)
-	err := c.cc.Invoke(ctx, "/ClientToServerService/Leave", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ClientToServer.ClientToServerService/Leave", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (c *clientToServerServiceClient) Leave(ctx context.Context, in *Address, op
 
 func (c *clientToServerServiceClient) Publish(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Status, error) {
 	out := new(Status)
-	err := c.cc.Invoke(ctx, "/ClientToServerService/Publish", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ClientToServer.ClientToServerService/Publish", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func _ClientToServerService_Join_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ClientToServerService/Join",
+		FullMethod: "/ClientToServer.ClientToServerService/Join",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClientToServerServiceServer).Join(ctx, req.(*Address))
@@ -122,7 +122,7 @@ func _ClientToServerService_Leave_Handler(srv interface{}, ctx context.Context, 
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ClientToServerService/Leave",
+		FullMethod: "/ClientToServer.ClientToServerService/Leave",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClientToServerServiceServer).Leave(ctx, req.(*Address))
@@ -140,7 +140,7 @@ func _ClientToServerService_Publish_Handler(srv interface{}, ctx context.Context
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ClientToServerService/Publish",
+		FullMethod: "/ClientToServer.ClientToServerService/Publish",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClientToServerServiceServer).Publish(ctx, req.(*Message))
@@ -152,7 +152,7 @@ func _ClientToServerService_Publish_Handler(srv interface{}, ctx context.Context
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ClientToServerService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "ClientToServerService",
+	ServiceName: "ClientToServer.ClientToServerService",
 	HandlerType: (*ClientToServerServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

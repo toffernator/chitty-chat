@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package ClientToServer;
+
 option go_package = "github.com/toffernator/chitty-chat/client/bindings";
 
 message Address {

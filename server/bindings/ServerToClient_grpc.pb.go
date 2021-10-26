@@ -31,7 +31,7 @@ func NewServerToClientClient(cc grpc.ClientConnInterface) ServerToClientClient {
 
 func (c *serverToClientClient) Broadcast(ctx context.Context, in *Message, opts ...grpc.CallOption) (*StatusOk, error) {
 	out := new(StatusOk)
-	err := c.cc.Invoke(ctx, "/ServerToClient/Broadcast", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ServerToClient.ServerToClient/Broadcast", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func _ServerToClient_Broadcast_Handler(srv interface{}, ctx context.Context, dec
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ServerToClient/Broadcast",
+		FullMethod: "/ServerToClient.ServerToClient/Broadcast",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ServerToClientServer).Broadcast(ctx, req.(*Message))
@@ -88,7 +88,7 @@ func _ServerToClient_Broadcast_Handler(srv interface{}, ctx context.Context, dec
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var ServerToClient_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "ServerToClient",
+	ServiceName: "ServerToClient.ServerToClient",
 	HandlerType: (*ServerToClientServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
