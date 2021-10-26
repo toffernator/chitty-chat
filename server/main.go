@@ -6,7 +6,9 @@ import (
 	"log"
 	"net"
 
-	"github.com/toffernator/chitty-chat/client/bindings"
+	ClientBindings "github.com/toffernator/chitty-chat/client/bindings"
+	"github.com/toffernator/chitty-chat/logicalclock"
+	ServerBindings "github.com/toffernator/chitty-chat/server/bindings"
 	"google.golang.org/grpc"
 )
 
@@ -15,29 +17,43 @@ const (
 )
 
 type Server struct {
-	clients []string
-	bindings.UnimplementedClientToServerServiceServer
+	clients []ServerBindings.ServerToClientClient
+	lamport logicalclock.LamportClock
+	ClientBindings.UnimplementedClientToServerServiceServer
 }
 
-func (s *Server) Join(ctx context.Context, in *bindings.Address) (*bindings.StatusOk, error) {
+func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
 	fmt.Printf("Client %s joining server %s", in.Address, address)
-	return &bindings.StatusOk{
+
+	// Create a new client for the given address
+	conn, err := grpc.Dial(in.Address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("Client with address %s failed to join\n", in.Address)
+	}
+	// USUALLY HERE: defer conn.close()
+
+	client := ServerBindings.NewServerToClientClient(conn)
+	s.clients = append(s.clients, client)
+	broadcastMsg := fmt.Sprintf("%s @ %s joined", in.Address, s.lamport.Read())
+	s.broadcast(broadcastMsg)
+
+	return &ClientBindings.StatusOk{
 		LamportTs: 0,
 	}, nil
 }
 
-func (s *Server) Leave(ctx context.Context, in *bindings.Address) (*bindings.StatusOk, error) {
+func (s *Server) Leave(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
 	fmt.Printf("Client %s leaving server %s", in.Address, address)
-	return &bindings.StatusOk{
+	return &ClientBindings.StatusOk{
 		LamportTs: 0,
 	}, nil
 }
 
-func (s *Server) Publish(ctx context.Context, in *bindings.Message) (*bindings.Status, error) {
+func (s *Server) Publish(ctx context.Context, in *ClientBindings.Message) (*ClientBindings.Status, error) {
 	fmt.Printf("Client %s publishing to server %s: %s", in.Sender, address, in.Contents)
-	return &bindings.Status{
+	return &ClientBindings.Status{
 		LamportTs:  0,
-		StatusCode: bindings.Status_OK,
+		StatusCode: ClientBindings.Status_OK,
 	}, nil
 }
 
@@ -50,7 +66,7 @@ func main() {
 
 	server := Server{}
 
-	bindings.RegisterClientToServerServiceServer(s, &server)
+	ClientBindings.RegisterClientToServerServiceServer(s, &server)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
