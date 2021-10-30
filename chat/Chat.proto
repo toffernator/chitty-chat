@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package ClientToServer;
+package chat;
 
-option go_package = "github.com/toffernator/chitty-chat/client/bindings";
+option go_package = "github.com/toffernator/chitty-chat/chat/protobuf";
 
 message Address {
     int64 lamportTs = 1;
@@ -29,7 +29,7 @@ message Message {
     string sender = 3;
 }
 
-service ClientToServerService {
+service ChatService {
     rpc Join(Address) returns (StatusOk);
     rpc Leave(Address) returns (StatusOk);
     rpc Publish(Message) returns (Status);

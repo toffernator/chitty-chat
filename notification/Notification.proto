@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package notification;
+
+option go_package = "github.com/toffernator/chitty-chat/notification/protobuf";
+
+message Message {
+    int64 lamportTs = 1;
+    string contents = 2;
+}
+
+message StatusOk {
+    int64 lamportTs = 1;
+}
+
+service NotificationService {
+    rpc Notify(Message) returns (StatusOk);
+}
