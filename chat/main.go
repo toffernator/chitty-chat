@@ -100,16 +100,25 @@ func (s *ChatServer) Publish(ctx context.Context, in *chatPb.Message) (*chatPb.S
 	}
 
 	broadcastMsg := fmt.Sprintf("Ts: %d -- %s: %s", s.lamport.Read(), in.Sender, in.Contents)
-	s.broadcast(broadcastMsg)
-
+	nodes, successes := s.broadcast(broadcastMsg)
 	s.lamport.Increment()
-	return &chatPb.Status{
-		LamportTs:  s.lamport.Read(),
-		StatusCode: chatPb.Status_OK,
-	}, nil
+	if successes < nodes {
+		log.Printf("Ts: %d -- Attempted to broadcast to %d nodes but only %d requests succeeded", s.lamport.Read(), nodes, successes)
+		return &chatPb.Status{
+			LamportTs:  s.lamport.Read(),
+			StatusCode: chatPb.Status_INCOMPLETEBROADCAST,
+		}, nil
+	} else {
+		return &chatPb.Status{
+			LamportTs:  s.lamport.Read(),
+			StatusCode: chatPb.Status_OK,
+		}, nil
+	}
+
 }
 
-func (s *ChatServer) broadcast(msg string) {
+func (s *ChatServer) broadcast(msg string) (total int, successes int) {
+	failed := 0
 	for address, client := range s.clients {
 		s.lamport.Increment()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -121,8 +130,10 @@ func (s *ChatServer) broadcast(msg string) {
 		})
 		if err != nil {
 			log.Printf("Ts: %d -- Failed to notify client at %s with error: %v\n", s.lamport.Read(), address, err.Error())
+			failed++
 		}
 	}
+	return len(s.clients), len(s.clients) - failed
 }
 
 func validateMessage(msg string) bool {
