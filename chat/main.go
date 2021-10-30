@@ -7,9 +7,9 @@ import (
 	"net"
 	"time"
 
-	ClientBindings "github.com/toffernator/chitty-chat/client/bindings"
+	chatPb "github.com/toffernator/chitty-chat/chat/protobuf"
 	"github.com/toffernator/chitty-chat/logicalclock"
-	ServerBindings "github.com/toffernator/chitty-chat/server/bindings"
+	notificationPb "github.com/toffernator/chitty-chat/notification/protobuf"
 	"google.golang.org/grpc"
 )
 
@@ -17,25 +17,25 @@ const (
 	address = "localhost:50051"
 )
 
-type Server struct {
+type ChatServer struct {
 	clients map[string]client
 	lamport logicalclock.LamportClock
-	ClientBindings.UnimplementedClientToServerServiceServer
+	chatPb.UnimplementedChatServiceServer
 }
 
 type client struct {
-	ServerBindings.ServerToClientClient
+	notificationPb.NotificationServiceClient
 	Connection *grpc.ClientConn
 }
 
-func NewServer() *Server {
-	s := Server{
+func NewServer() *ChatServer {
+	s := ChatServer{
 		clients: make(map[string]client),
 	}
 	return &s
 }
 
-func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
+func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.StatusOk, error) {
 	fmt.Printf("Client %s joining server %s", in.Address, address)
 
 	// Create a new client for the given address
@@ -43,23 +43,23 @@ func (s *Server) Join(ctx context.Context, in *ClientBindings.Address) (*ClientB
 	if err != nil {
 		log.Fatalf("Client with address %s failed to join\n", in.Address)
 	}
-	// USUALLY HERE: defer conn.close()
 
 	// Adding to map
 	client := client{
-		ServerBindings.NewServerToClientClient(conn),
+		notificationPb.NewNotificationServiceClient(conn),
 		conn,
 	}
 	s.clients[in.Address] = client
+
 	broadcastMsg := fmt.Sprintf("%s @ %d joined", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
 
-	return &ClientBindings.StatusOk{
+	return &chatPb.StatusOk{
 		LamportTs: 0,
 	}, nil
 }
 
-func (s *Server) Leave(ctx context.Context, in *ClientBindings.Address) (*ClientBindings.StatusOk, error) {
+func (s *ChatServer) Leave(ctx context.Context, in *chatPb.Address) (*chatPb.StatusOk, error) {
 	log.Printf("Client %s leaving", in.Address)
 
 	for address, client := range s.clients {
@@ -72,24 +72,24 @@ func (s *Server) Leave(ctx context.Context, in *ClientBindings.Address) (*Client
 	broadcastMsg := fmt.Sprintf("%s has left @ %d", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
 
-	return &ClientBindings.StatusOk{}, nil
+	return &chatPb.StatusOk{}, nil
 }
 
-func (s *Server) Publish(ctx context.Context, in *ClientBindings.Message) (*ClientBindings.Status, error) {
+func (s *ChatServer) Publish(ctx context.Context, in *chatPb.Message) (*chatPb.Status, error) {
 	fmt.Printf("Client %s publishing to server %s: %s", in.Sender, address, in.Contents)
 	broadcastMsg := fmt.Sprintf("%s @ %d: %s", in.Sender, s.lamport.Read(), in.Contents)
 	s.broadcast(broadcastMsg)
-	return &ClientBindings.Status{
+	return &chatPb.Status{
 		LamportTs:  0,
-		StatusCode: ClientBindings.Status_OK,
+		StatusCode: chatPb.Status_OK,
 	}, nil
 }
 
-func (s *Server) broadcast(msg string) {
+func (s *ChatServer) broadcast(msg string) {
 	for _, client := range s.clients {
 		requestctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		go client.Broadcast(requestctx, &ServerBindings.Message{
+		go client.Notify(requestctx, &notificationPb.Message{
 			LamportTs: 0,
 			Contents:  msg,
 		})
@@ -105,7 +105,7 @@ func main() {
 
 	server := NewServer()
 
-	ClientBindings.RegisterClientToServerServiceServer(s, server)
+	chatPb.RegisterChatServiceServer(s, server)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
