@@ -27,6 +27,11 @@ type NotificationServer struct {
 	notificationPb.UnimplementedNotificationServiceServer
 }
 
+type ChatClient struct {
+	chatPb.ChatServiceClient
+	conn *grpc.ClientConn
+}
+
 func (n *NotificationServer) Notify(ctx context.Context, in *notificationPb.Message) (*notificationPb.StatusOk, error) {
 	fmt.Printf("Client %s received following message: %s", n.clientHost, in.Contents)
 	return &notificationPb.StatusOk{
@@ -34,15 +39,51 @@ func (n *NotificationServer) Notify(ctx context.Context, in *notificationPb.Mess
 	}, nil
 }
 
-func publish(msg string, conn *grpc.ClientConn) {
-	client := chatPb.NewChatServiceClient(conn)
+func join(address string) *ChatClient {
+	conn, err := grpc.Dial(serverHost, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		panic(err)
+	}
+
+	client := &ChatClient{
+		chatPb.NewChatServiceClient(conn),
+		conn,
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	client.Publish(ctx, &chatPb.Message{
+	_, err = client.Join(ctx, &chatPb.Address{Address: "localhost:50052"})
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	return client
+}
+
+func (c *ChatClient) publish(msg string) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := c.Publish(ctx, &chatPb.Message{
 		LamportTs: 0,
 		Sender:    address,
 		Contents:  msg,
 	})
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+}
+
+func (c *ChatClient) leave() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	defer c.conn.Close()
+
+	_, err := c.Leave(ctx, &chatPb.Address{Address: address})
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 }
 
 func serve() {
@@ -53,41 +94,38 @@ func serve() {
 	}
 	s := grpc.NewServer()
 
-	notificationServer := NotificationServer{}
+	notificationServer := &NotificationServer{
+		serverHost: serverHost,
+		clientHost: address,
+	}
 
-	notificationPb.RegisterNotificationServiceServer(s, &notificationServer)
+	notificationPb.RegisterNotificationServiceServer(s, notificationServer)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
 }
 
-func main() {
-	go serve()
-
-	// Connect to remote server
-	conn, err := grpc.Dial(serverHost, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	// Parse user-input
+func handleUserInput() {
+	client := join(serverHost)
 	for {
-		// Read user input
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			input := scanner.Text()
-
-			// Parse input
 			parsed := strings.SplitN(input, " ", 2)
-			fmt.Printf("%v\n", parsed)
 
-			// Act on user input
 			switch parsed[0] {
 			case "/publish":
-				publish(parsed[1], conn)
+				client.publish(parsed[1])
+			case "/leave":
+				client.leave()
+				os.Exit(0)
 			}
 		}
 	}
+}
+
+func main() {
+	go handleUserInput()
+	serve()
 }

@@ -18,19 +18,19 @@ const (
 )
 
 type ChatServer struct {
-	clients map[string]client
+	clients map[string]*NotificationClient
 	lamport logicalclock.LamportClock
 	chatPb.UnimplementedChatServiceServer
 }
 
-type client struct {
+type NotificationClient struct {
 	notificationPb.NotificationServiceClient
 	Connection *grpc.ClientConn
 }
 
 func NewServer() *ChatServer {
 	s := ChatServer{
-		clients: make(map[string]client),
+		clients: make(map[string]*NotificationClient),
 	}
 	return &s
 }
@@ -45,11 +45,11 @@ func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.Stat
 	}
 
 	// Adding to map
-	client := client{
+	client := NotificationClient{
 		notificationPb.NewNotificationServiceClient(conn),
 		conn,
 	}
-	s.clients[in.Address] = client
+	s.clients[in.Address] = &client
 
 	broadcastMsg := fmt.Sprintf("%s @ %d joined", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
@@ -87,12 +87,17 @@ func (s *ChatServer) Publish(ctx context.Context, in *chatPb.Message) (*chatPb.S
 
 func (s *ChatServer) broadcast(msg string) {
 	for _, client := range s.clients {
+		log.Printf("%s\n", client.Connection.Target())
+
 		requestctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		go client.Notify(requestctx, &notificationPb.Message{
+		_, err := client.Notify(requestctx, &notificationPb.Message{
 			LamportTs: 0,
 			Contents:  msg,
 		})
+		if err != nil {
+			log.Println(err.Error())
+		}
 	}
 }
 
