@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	chatPb "github.com/toffernator/chitty-chat/chat/protobuf"
+	"github.com/toffernator/chitty-chat/logicalclock"
 	notificationPb "github.com/toffernator/chitty-chat/notification/protobuf"
 
 	"google.golang.org/grpc"
@@ -18,6 +18,7 @@ import (
 
 type NotificationServer struct {
 	address string
+	lamport logicalclock.LamportTimer
 	notificationPb.UnimplementedNotificationServiceServer
 }
 
@@ -27,13 +28,17 @@ var (
 
 type ChatClient struct {
 	chatPb.ChatServiceClient
-	conn *grpc.ClientConn
+	lamport logicalclock.LamportTimer
+	conn    *grpc.ClientConn
 }
 
 func (n *NotificationServer) Notify(ctx context.Context, in *notificationPb.Message) (*notificationPb.StatusOk, error) {
-	fmt.Printf("Client %s received following message: %s\n", n.address, in.Contents)
+	log.Printf("Client %s received following message: %s\n", n.address, in.Contents)
+	n.lamport.Update(logicalclock.NewLamportClock(in.LamportTs))
+
+	n.lamport.Increment()
 	return &notificationPb.StatusOk{
-		LamportTs: 0,
+		LamportTs: n.lamport.Read(),
 	}, nil
 }
 
@@ -45,15 +50,21 @@ func join(target string) *ChatClient {
 
 	client := &ChatClient{
 		chatPb.NewChatServiceClient(conn),
+		logicalclock.NewLamportClock(0),
 		conn,
 	}
 
+	client.lamport.Increment()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = client.Join(ctx, &chatPb.Address{Address: address})
+	status, err := client.Join(ctx, &chatPb.Address{
+		LamportTs: client.lamport.Read(),
+		Address:   address,
+	})
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
+	client.lamport.Update(logicalclock.NewLamportClock(status.LamportTs))
 
 	return client
 }
@@ -61,15 +72,22 @@ func join(target string) *ChatClient {
 func (c *ChatClient) publish(msg string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+	c.lamport.Increment()
 
-	_, err := c.Publish(ctx, &chatPb.Message{
-		LamportTs: 0,
+	status, err := c.Publish(ctx, &chatPb.Message{
+		LamportTs: c.lamport.Read(),
 		Sender:    address,
 		Contents:  msg,
 	})
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
+	if status.StatusCode == 1 {
+		log.Println("ChatServer rejected the message since it was invalid.")
+	} else if status.StatusCode == 2 {
+		log.Println("ChatServer was not able to broadcast to all clients.")
+	}
+	c.lamport.Update(logicalclock.NewLamportClock(status.LamportTs))
 }
 
 func (c *ChatClient) leave() {
@@ -78,10 +96,14 @@ func (c *ChatClient) leave() {
 
 	defer c.conn.Close()
 
-	_, err := c.Leave(ctx, &chatPb.Address{Address: address})
+	c.lamport.Increment()
+
+	status, err := c.Leave(ctx, &chatPb.Address{Address: address})
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
+
+	c.lamport.Update(logicalclock.NewLamportClock(status.LamportTs))
 }
 
 func serve() {
@@ -93,6 +115,7 @@ func serve() {
 
 	notificationServer := &NotificationServer{
 		address: address,
+		lamport: logicalclock.NewLamportClock(0),
 	}
 
 	notificationPb.RegisterNotificationServiceServer(s, notificationServer)

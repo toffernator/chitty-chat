@@ -6,6 +6,10 @@ type LamportTimer interface {
 	Update(other LamportTimer)
 }
 
+func NewLamportClock(ts int64) *LamportClock {
+	return &LamportClock{timestamp: ts}
+}
+
 type LamportClock struct {
 	timestamp int64
 }
