@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package ServerToClient;
+package notification;
 
-option go_package = "github.com/toffernator/chitty-chat/server/bindings";
+option go_package = "github.com/toffernator/chitty-chat/notification/protobuf";
 
 message Message {
     int64 lamportTs = 1;
@@ -13,6 +13,6 @@ message StatusOk {
     int64 lamportTs = 1;
 }
 
-service ServerToClient {
-    rpc Broadcast(Message) returns (StatusOk);
+service NotificationService {
+    rpc Notify(Message) returns (StatusOk);
 }
