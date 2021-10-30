@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -38,13 +39,12 @@ func NewServer() *ChatServer {
 func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.StatusOk, error) {
 	fmt.Printf("Client %s joining server %s", in.Address, address)
 
-	// Create a new client for the given address
 	conn, err := grpc.Dial(in.Address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("Client with address %s failed to join\n", in.Address)
+		log.Printf("Client with address %s failed to join\n", in.Address)
+		return nil, errors.New("Server failed to establish a notification connection")
 	}
 
-	// Adding to map
 	client := NotificationClient{
 		notificationPb.NewNotificationServiceClient(conn),
 		conn,
@@ -60,11 +60,14 @@ func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.Stat
 }
 
 func (s *ChatServer) Leave(ctx context.Context, in *chatPb.Address) (*chatPb.StatusOk, error) {
-	log.Printf("Client %s leaving", in.Address)
+	log.Printf("Client %s leaving\n", in.Address)
 
 	for address, client := range s.clients {
 		if address == in.Address {
-			client.Connection.Close()
+			if err := client.Connection.Close(); err != nil {
+				log.Fatalf("Failed to close connection with error: %s", err.Error())
+			}
+
 			delete(s.clients, address)
 		}
 	}
@@ -76,9 +79,11 @@ func (s *ChatServer) Leave(ctx context.Context, in *chatPb.Address) (*chatPb.Sta
 }
 
 func (s *ChatServer) Publish(ctx context.Context, in *chatPb.Message) (*chatPb.Status, error) {
-	fmt.Printf("Client %s publishing to server %s: %s", in.Sender, address, in.Contents)
+	log.Printf("Client %s publishing to server %s: %s\n", in.Sender, address, in.Contents)
+
 	broadcastMsg := fmt.Sprintf("%s @ %d: %s", in.Sender, s.lamport.Read(), in.Contents)
 	s.broadcast(broadcastMsg)
+
 	return &chatPb.Status{
 		LamportTs:  0,
 		StatusCode: chatPb.Status_OK,
@@ -86,17 +91,16 @@ func (s *ChatServer) Publish(ctx context.Context, in *chatPb.Message) (*chatPb.S
 }
 
 func (s *ChatServer) broadcast(msg string) {
-	for _, client := range s.clients {
-		log.Printf("%s\n", client.Connection.Target())
-
-		requestctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	for address, client := range s.clients {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		_, err := client.Notify(requestctx, &notificationPb.Message{
+		
+		_, err := client.Notify(ctx, &notificationPb.Message{
 			LamportTs: 0,
 			Contents:  msg,
 		})
 		if err != nil {
-			log.Println(err.Error())
+			log.Printf("Failed to notify client at %s with error: %v\n", address, err.Error())
 		}
 	}
 }
@@ -111,7 +115,7 @@ func main() {
 	server := NewServer()
 
 	chatPb.RegisterChatServiceServer(s, server)
-	log.Printf("server listening at %v", lis.Addr())
+	log.Printf("server listening at %v\n", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

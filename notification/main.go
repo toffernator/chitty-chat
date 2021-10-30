@@ -16,16 +16,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	serverHost = "localhost:50051"
-	address    = "localhost:50052"
-)
-
 type NotificationServer struct {
-	serverHost string
-	clientHost string
+	address string
 	notificationPb.UnimplementedNotificationServiceServer
 }
+
+var (
+	address string
+)
 
 type ChatClient struct {
 	chatPb.ChatServiceClient
@@ -33,14 +31,14 @@ type ChatClient struct {
 }
 
 func (n *NotificationServer) Notify(ctx context.Context, in *notificationPb.Message) (*notificationPb.StatusOk, error) {
-	fmt.Printf("Client %s received following message: %s", n.clientHost, in.Contents)
+	fmt.Printf("Client %s received following message: %s\n", n.address, in.Contents)
 	return &notificationPb.StatusOk{
 		LamportTs: 0,
 	}, nil
 }
 
-func join(address string) *ChatClient {
-	conn, err := grpc.Dial(serverHost, grpc.WithInsecure(), grpc.WithBlock())
+func join(target string) *ChatClient {
+	conn, err := grpc.Dial(target, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +50,7 @@ func join(address string) *ChatClient {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = client.Join(ctx, &chatPb.Address{Address: "localhost:50052"})
+	_, err = client.Join(ctx, &chatPb.Address{Address: address})
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -87,7 +85,6 @@ func (c *ChatClient) leave() {
 }
 
 func serve() {
-	// Set-up client "service"
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
@@ -95,8 +92,7 @@ func serve() {
 	s := grpc.NewServer()
 
 	notificationServer := &NotificationServer{
-		serverHost: serverHost,
-		clientHost: address,
+		address: address,
 	}
 
 	notificationPb.RegisterNotificationServiceServer(s, notificationServer)
@@ -107,7 +103,7 @@ func serve() {
 }
 
 func handleUserInput() {
-	client := join(serverHost)
+	var client *ChatClient
 	for {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
@@ -115,17 +111,33 @@ func handleUserInput() {
 			parsed := strings.SplitN(input, " ", 2)
 
 			switch parsed[0] {
+			case "/join":
+				if client == nil {
+					client = join(parsed[1])
+				} else {
+					log.Println("You must call /leave before joining a new chat service")
+				}
 			case "/publish":
-				client.publish(parsed[1])
+				if client != nil {
+					client.publish(parsed[1])
+				} else {
+					log.Println("You must call /join before publishing")
+				}
 			case "/leave":
-				client.leave()
-				os.Exit(0)
+				if client != nil {
+					client.leave()
+					client = nil
+				} else {
+					log.Println("You must call /join before leaving")
+				}
 			}
 		}
 	}
 }
 
 func main() {
+	address = os.Args[1]
+
 	go handleUserInput()
 	serve()
 }
