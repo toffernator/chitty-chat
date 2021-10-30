@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/toffernator/chitty-chat/client/bindings"
+	chatPb "github.com/toffernator/chitty-chat/chat/protobuf"
+	notificationPb "github.com/toffernator/chitty-chat/notification/protobuf"
 
 	"google.golang.org/grpc"
 )
@@ -20,24 +21,24 @@ const (
 	address    = "localhost:50052"
 )
 
-type Client struct {
+type NotificationServer struct {
 	serverHost string
 	clientHost string
-	bindings.UnimplementedClientToServerServiceServer
+	notificationPb.UnimplementedNotificationServiceServer
 }
 
-func (c *Client) Broadcast(ctx context.Context, in *bindings.Message) (*bindings.StatusOk, error) {
-	fmt.Printf("Client %s received following message: %s", c.clientHost, in.Contents)
-	return &bindings.StatusOk{
+func (n *NotificationServer) Notify(ctx context.Context, in *notificationPb.Message) (*notificationPb.StatusOk, error) {
+	fmt.Printf("Client %s received following message: %s", n.clientHost, in.Contents)
+	return &notificationPb.StatusOk{
 		LamportTs: 0,
 	}, nil
 }
 
 func publish(msg string, conn *grpc.ClientConn) {
-	client := bindings.NewClientToServerServiceClient(conn)
+	client := chatPb.NewChatServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	client.Publish(ctx, &bindings.Message{
+	client.Publish(ctx, &chatPb.Message{
 		LamportTs: 0,
 		Sender:    address,
 		Contents:  msg,
@@ -52,9 +53,9 @@ func serve() {
 	}
 	s := grpc.NewServer()
 
-	clientServer := Client{}
+	notificationServer := NotificationServer{}
 
-	bindings.RegisterClientToServerServiceServer(s, clientServer)
+	notificationPb.RegisterNotificationServiceServer(s, &notificationServer)
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
