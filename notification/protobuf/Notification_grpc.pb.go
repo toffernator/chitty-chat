@@ -18,7 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NotificationServiceClient interface {
-	Notify(ctx context.Context, in *Message, opts ...grpc.CallOption) (*StatusOk, error)
+	Broadcast(ctx context.Context, in *Message, opts ...grpc.CallOption) (*StatusOk, error)
 }
 
 type notificationServiceClient struct {
@@ -29,9 +29,9 @@ func NewNotificationServiceClient(cc grpc.ClientConnInterface) NotificationServi
 	return &notificationServiceClient{cc}
 }
 
-func (c *notificationServiceClient) Notify(ctx context.Context, in *Message, opts ...grpc.CallOption) (*StatusOk, error) {
+func (c *notificationServiceClient) Broadcast(ctx context.Context, in *Message, opts ...grpc.CallOption) (*StatusOk, error) {
 	out := new(StatusOk)
-	err := c.cc.Invoke(ctx, "/notification.NotificationService/Notify", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/notification.NotificationService/Broadcast", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *notificationServiceClient) Notify(ctx context.Context, in *Message, opt
 // All implementations must embed UnimplementedNotificationServiceServer
 // for forward compatibility
 type NotificationServiceServer interface {
-	Notify(context.Context, *Message) (*StatusOk, error)
+	Broadcast(context.Context, *Message) (*StatusOk, error)
 	mustEmbedUnimplementedNotificationServiceServer()
 }
 
@@ -50,8 +50,8 @@ type NotificationServiceServer interface {
 type UnimplementedNotificationServiceServer struct {
 }
 
-func (UnimplementedNotificationServiceServer) Notify(context.Context, *Message) (*StatusOk, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
+func (UnimplementedNotificationServiceServer) Broadcast(context.Context, *Message) (*StatusOk, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
 func (UnimplementedNotificationServiceServer) mustEmbedUnimplementedNotificationServiceServer() {}
 
@@ -66,20 +66,20 @@ func RegisterNotificationServiceServer(s grpc.ServiceRegistrar, srv Notification
 	s.RegisterService(&NotificationService_ServiceDesc, srv)
 }
 
-func _NotificationService_Notify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _NotificationService_Broadcast_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Message)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NotificationServiceServer).Notify(ctx, in)
+		return srv.(NotificationServiceServer).Broadcast(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/notification.NotificationService/Notify",
+		FullMethod: "/notification.NotificationService/Broadcast",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NotificationServiceServer).Notify(ctx, req.(*Message))
+		return srv.(NotificationServiceServer).Broadcast(ctx, req.(*Message))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -92,8 +92,8 @@ var NotificationService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*NotificationServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Notify",
-			Handler:    _NotificationService_Notify_Handler,
+			MethodName: "Broadcast",
+			Handler:    _NotificationService_Broadcast_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

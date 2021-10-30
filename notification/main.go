@@ -32,8 +32,8 @@ type ChatClient struct {
 	conn    *grpc.ClientConn
 }
 
-func (n *NotificationServer) Notify(ctx context.Context, in *notificationPb.Message) (*notificationPb.StatusOk, error) {
-	log.Printf("Client %s received following message: %s\n", n.address, in.Contents)
+func (n *NotificationServer) Broadcast(ctx context.Context, in *notificationPb.Message) (*notificationPb.StatusOk, error) {
+	log.Printf("Received a message at Lamport time %d: %s\n", n.lamport.Read(), in.Contents)
 	n.lamport.Update(logicalclock.NewLamportClock(in.LamportTs))
 
 	n.lamport.Increment()
@@ -104,6 +104,7 @@ func (c *ChatClient) leave() {
 	}
 
 	c.lamport.Update(logicalclock.NewLamportClock(status.LamportTs))
+	log.Println("Disconnected.")
 }
 
 func serve() {

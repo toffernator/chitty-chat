@@ -14,5 +14,5 @@ message StatusOk {
 }
 
 service NotificationService {
-    rpc Notify(Message) returns (StatusOk);
+    rpc Broadcast(Message) returns (StatusOk);
 }

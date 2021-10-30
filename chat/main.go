@@ -38,12 +38,12 @@ func NewServer() *ChatServer {
 }
 
 func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.StatusOk, error) {
-	log.Printf("Ts: %d -- Client %s joining server %s\n", s.lamport.Read(), in.Address, address)
+	log.Printf("Participant %s joined Chitty-Chat at Lamport time %d\n", in.Address, s.lamport.Read())
 	s.lamport.Update(logicalclock.NewLamportClock(in.LamportTs))
 
 	conn, err := grpc.Dial(in.Address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Printf("Ts: %d -- Client with address %s failed to join\n", s.lamport.Read(), in.Address)
+		log.Printf("Participant %s failed to join Chitty-Chat at Lamport time %d\n", in.Address, s.lamport.Read())
 		return nil, errors.New("Server failed to establish a notification connection")
 	}
 
@@ -53,7 +53,7 @@ func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.Stat
 	}
 	s.clients[in.Address] = &client
 
-	broadcastMsg := fmt.Sprintf("Ts: %d -- %s joined", s.lamport.Read(), in.Address)
+	broadcastMsg := fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time %d\n", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
 
 	s.lamport.Increment()
@@ -64,7 +64,7 @@ func (s *ChatServer) Join(ctx context.Context, in *chatPb.Address) (*chatPb.Stat
 }
 
 func (s *ChatServer) Leave(ctx context.Context, in *chatPb.Address) (*chatPb.StatusOk, error) {
-	log.Printf("Ts: %d -- Client %s leaving\n", s.lamport.Read(), in.Address)
+	log.Printf("Participant %s left Chitty-Chat at Lamport time %d\n", in.Address, s.lamport.Read())
 	s.lamport.Update(logicalclock.NewLamportClock(in.LamportTs))
 
 	for address, client := range s.clients {
@@ -77,7 +77,7 @@ func (s *ChatServer) Leave(ctx context.Context, in *chatPb.Address) (*chatPb.Sta
 		}
 	}
 
-	broadcastMsg := fmt.Sprintf("Ts: %d -- %s has left", s.lamport.Read(), in.Address)
+	broadcastMsg := fmt.Sprintf("Participant %s left Chitty-Chat at Lamport time %d\n", in.Address, s.lamport.Read())
 	s.broadcast(broadcastMsg)
 
 	s.lamport.Increment()
@@ -99,7 +99,7 @@ func (s *ChatServer) Publish(ctx context.Context, in *chatPb.Message) (*chatPb.S
 		}, nil
 	}
 
-	broadcastMsg := fmt.Sprintf("Ts: %d -- %s: %s", s.lamport.Read(), in.Sender, in.Contents)
+	broadcastMsg := fmt.Sprintf("%s: %s", in.Sender, in.Contents)
 	nodes, successes := s.broadcast(broadcastMsg)
 	s.lamport.Increment()
 	if successes < nodes {
@@ -124,12 +124,12 @@ func (s *ChatServer) broadcast(msg string) (total int, successes int) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		_, err := client.Notify(ctx, &notificationPb.Message{
+		_, err := client.Broadcast(ctx, &notificationPb.Message{
 			LamportTs: s.lamport.Read(),
-			Contents:  msg,
+			Contents:  "ChatServer " + msg,
 		})
 		if err != nil {
-			log.Printf("Ts: %d -- Failed to notify client at %s with error: %v\n", s.lamport.Read(), address, err.Error())
+			log.Printf("Ts: %d -- Failed to Broadcast client at %s with error: %v\n", s.lamport.Read(), address, err.Error())
 			failed++
 		}
 	}
