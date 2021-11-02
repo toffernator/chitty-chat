@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	chatPb "github.com/toffernator/chitty-chat/chat/protobuf"
@@ -14,8 +15,8 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	address = "localhost:50051"
+var (
+	address string
 )
 
 type ChatServer struct {
@@ -141,6 +142,10 @@ func validateMessage(msg string) bool {
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatalln("Must pass the listen address as an argument")
+	}
+	address = os.Args[1]
 	lis, err := net.Listen("tcp", address)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)

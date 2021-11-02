@@ -24,6 +24,7 @@ type NotificationServer struct {
 
 var (
 	address string
+	lamport logicalclock.LamportTimer
 )
 
 type ChatClient struct {
@@ -36,7 +37,6 @@ func (n *NotificationServer) Broadcast(ctx context.Context, in *notificationPb.M
 	log.Printf("Received a message at Lamport time %d: %s\n", n.lamport.Read(), in.Contents)
 	n.lamport.Update(logicalclock.NewLamportClock(in.LamportTs))
 
-	n.lamport.Increment()
 	return &notificationPb.StatusOk{
 		LamportTs: n.lamport.Read(),
 	}, nil
@@ -50,7 +50,7 @@ func join(target string) *ChatClient {
 
 	client := &ChatClient{
 		chatPb.NewChatServiceClient(conn),
-		logicalclock.NewLamportClock(0),
+		lamport,
 		conn,
 	}
 
@@ -116,7 +116,7 @@ func serve() {
 
 	notificationServer := &NotificationServer{
 		address: address,
-		lamport: logicalclock.NewLamportClock(0),
+		lamport: lamport,
 	}
 
 	notificationPb.RegisterNotificationServiceServer(s, notificationServer)
@@ -160,7 +160,11 @@ func handleUserInput() {
 }
 
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatalln("Must pass the listen address as an argument")
+	}
 	address = os.Args[1]
+	lamport = logicalclock.NewLamportClock(0)
 
 	go handleUserInput()
 	serve()
